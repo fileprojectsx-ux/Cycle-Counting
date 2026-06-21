@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cycle Count">
+<meta name="application-name" content="Cycle Count">
+<meta name="theme-color" content="#6c63ff">
+<title>Cycle Counting</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- SheetJS untuk export XLSX -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f0f2ff; --white:#fff; --border:#dde2ff;
+  --purple:#6c63ff; --purple2:#8b82ff; --blue:#0ea5e9;
+  --green:#10b981; --red:#ef4444; --navy:#2563eb;
+  --text:#16113a; --muted:#8b8fba;
+  --orange:#f59e0b;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+html,body{
+  width:100%;min-height:100vh;
+  font-family:'Nunito',sans-serif;
+  background:var(--bg);color:var(--text);
+  font-size:4vw;
+  overflow-x:hidden;
+  -webkit-text-size-adjust:none;
+  text-size-adjust:none;
+}
+
+/* ── LOADING ── */
+#loader{position:fixed;inset:0;background:rgba(255,255,255,0.9);z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:4vw;}
+#loader.on{display:flex;}
+.spin{width:11vw;height:11vw;border:1vw solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#ldrtxt{font-size:4vw;font-weight:700;color:var(--muted);}
+
+/* ── SCREENS ── */
+#s-login{display:none;flex-direction:column;min-height:100vh;background:var(--bg);}
+#s-login.on{display:flex;}
+#s-app{display:none;flex-direction:column;min-height:100vh;}
+#s-app.on{display:flex;}
+
+/* ══ LOGIN ══ */
+.login-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8vw 6vw 4vw;}
+.login-title{font-family:'Syne',sans-serif;font-size:6.5vw;font-weight:800;color:var(--purple);text-align:center;line-height:1.2;margin-bottom:1.2vw;}
+.login-sub{font-family:'Syne',sans-serif;font-size:4.2vw;font-weight:700;color:var(--purple2);text-align:center;margin-bottom:1.2vw;}
+.login-slogan{font-size:2.8vw;font-weight:700;color:var(--muted);text-align:center;letter-spacing:.5px;text-transform:uppercase;margin-bottom:7vw;}
+.login-card{width:100%;background:var(--white);border-radius:5vw;padding:6vw;border:0.5vw solid var(--border);box-shadow:0 4vw 10vw rgba(0,0,0,0.07);}
+.login-err{background:rgba(239,68,68,0.1);color:var(--red);padding:3vw 4vw;border-radius:3vw;font-size:3.5vw;font-weight:700;margin-bottom:4vw;display:none;}
+.login-err.on{display:block;}
+.inp-wrap{position:relative;margin-bottom:3.5vw;}
+.inp-wrap input{width:100%;height:14vw;padding:0 13vw 0 4.5vw;border-radius:3.5vw;border:0.5vw solid var(--border);background:#f5f6ff;font-family:'Nunito',sans-serif;font-size:4vw;color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;}
+.inp-wrap input:focus{border-color:var(--purple);box-shadow:0 0 0 1vw rgba(108,99,255,0.15);background:#fff;}
+.inp-wrap input::placeholder{color:var(--muted);}
+.eye-btn{position:absolute;right:0;top:0;width:13vw;height:14vw;background:none;border:none;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;}
+.eye-btn svg{width:5.5vw;height:5.5vw;}
+@keyframes glow{0%,100%{box-shadow:0 0 2vw 0.5vw rgba(108,99,255,0.35);}50%{box-shadow:0 0 5vw 1.5vw rgba(108,99,255,0.55);}}
+.login-btn{width:100%;height:14vw;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:none;border-radius:3.5vw;font-family:'Nunito',sans-serif;font-size:4.5vw;font-weight:700;cursor:pointer;margin-top:2vw;animation:glow 2.2s ease-in-out infinite;-webkit-appearance:none;}
+.login-btn:active{transform:scale(0.97);animation:none;}
+.ticker-box{width:100%;background:#e8eaf6;overflow:hidden;padding:2.5vw 0;margin-top:auto;border-top:0.5vw solid rgba(108,99,255,0.12);}
+.ticker-track{display:inline-flex;white-space:nowrap;animation:tick 22s linear infinite;}
+.ticker-item{display:inline-block;font-size:3vw;color:var(--muted);font-weight:700;padding:0 8vw;}
+.ticker-item .hl{color:var(--purple);}
+@keyframes tick{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* ══ APP HEADER ══ */
+.app-header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border-bottom:0.3vw solid var(--border);display:flex;align-items:center;height:15vw;padding:0 5vw;width:100%;}
+.back-btn{background:none;border:none;color:var(--purple);cursor:pointer;display:none;flex-direction:column;align-items:center;gap:0.5vw;padding:2vw 3vw 2vw 0;min-width:12vw;min-height:12vw;justify-content:center;}
+.back-btn.on{display:flex;}
+.back-btn .arr{font-size:5.5vw;font-weight:900;line-height:1;}
+.back-btn .lbl{font-size:2.5vw;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+.hdr-title{font-family:'Nunito',sans-serif;font-weight:800;font-size:4.5vw;flex:1;}
+.logout-btn{background:none;border:none;color:var(--red);cursor:pointer;padding:2vw;display:flex;align-items:center;justify-content:center;min-width:12vw;min-height:12vw;}
+.logout-btn svg{width:6vw;height:6vw;}
+
+/* ══ PAGES ══ */
+.page{display:none;padding:5vw 5vw calc(22vw + 5vw);width:100%;}
+.page.on{display:block;}
+
+/* ── SELECT PAGE ── */
+.sel-title{font-family:'Nunito',sans-serif;font-size:5vw;font-weight:800;margin-bottom:1vw;}
+.sel-sub{font-size:3.5vw;color:var(--muted);font-weight:700;margin-bottom:6vw;}
+.sec-lbl{display:block;font-size:3vw;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3.5vw;}
+.plant-grid{display:grid;grid-template-columns:1fr 1fr;gap:3vw;margin-bottom:6vw;}
+.plant-card{background:var(--white);border:0.5vw solid var(--border);border-radius:4.5vw;padding:5vw 3vw;cursor:pointer;text-align:center;position:relative;box-shadow:0 0.5vw 3vw rgba(108,99,255,0.08);transition:all .2s;min-height:26vw;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.plant-card:active{transform:scale(0.96);}
+.plant-card.sel{border-color:var(--purple);border-width:0.8vw;box-shadow:0 0 0 0.8vw rgba(108,99,255,0.15);background:linear-gradient(135deg,rgba(108,99,255,0.05),#fff);}
+.p-badge{position:absolute;top:2.5vw;right:3vw;font-size:2.8vw;font-weight:800;background:#f0f0ff;border:0.3vw solid var(--border);border-radius:99vw;padding:0.8vw 2.5vw;color:var(--muted);}
+.p-badge.has{background:rgba(108,99,255,0.12);color:var(--purple);border-color:rgba(108,99,255,0.3);}
+.p-code{font-family:'Syne',sans-serif;font-size:7vw;font-weight:800;color:var(--purple);margin-bottom:1vw;}
+.p-name{font-size:3.2vw;color:var(--muted);font-weight:700;}
+.date-inp{width:100%;height:14vw;padding:0 4.5vw;border-radius:3.5vw;border:0.5vw solid var(--border);background:#f5f6ff;font-family:'Nunito',sans-serif;font-size:4vw;color:var(--text);outline:none;margin-bottom:5vw;-webkit-appearance:none;transition:border-color .2s,box-shadow .2s;}
+.date-inp:focus{border-color:var(--purple);box-shadow:0 0 0 1vw rgba(108,99,255,0.15);background:#fff;}
+.alert{border-radius:3.5vw;padding:3.5vw 4vw;font-size:3.5vw;font-weight:700;margin-bottom:4vw;display:none;line-height:1.5;}
+.alert.on{display:block;}
+.alert-red{background:rgba(239,68,68,0.08);border:0.5vw solid rgba(239,68,68,0.25);color:#b91c1c;}
+.alert-blue{background:rgba(14,165,233,0.08);border:0.5vw solid rgba(14,165,233,0.25);color:#0369a1;}
+.main-btn{width:100%;height:14vw;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:none;border-radius:3.5vw;font-family:'Nunito',sans-serif;font-size:4.5vw;font-weight:700;cursor:pointer;box-shadow:0 1vw 4vw rgba(108,99,255,0.32);-webkit-appearance:none;}
+.main-btn:active{transform:scale(0.97);}
+.main-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+
+/* ── MAIN PAGE ── */
+.sub-header{position:sticky;top:15vw;z-index:90;background:rgba(240,242,255,0.97);border-bottom:0.3vw solid var(--border);padding:3vw 5vw;}
+.sub-meta{font-size:3.2vw;color:var(--muted);font-weight:700;}
+.srch-wrap{position:relative;margin-top:2.5vw;}
+.srch-wrap svg{position:absolute;left:4vw;top:50%;transform:translateY(-50%);width:4.5vw;height:4.5vw;color:var(--muted);}
+.srch-inp{width:100%;height:12vw;padding:0 13vw 0 11vw;border-radius:99vw;border:0.5vw solid var(--border);background:var(--white);font-family:'Nunito',sans-serif;font-size:4vw;color:var(--text);outline:none;box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.08);-webkit-appearance:none;}
+.srch-inp:focus{border-color:var(--purple);box-shadow:0 0 0 1vw rgba(108,99,255,0.12);}
+.srch-inp::placeholder{color:var(--muted);}
+.scan-btn{position:absolute;right:1vw;top:50%;transform:translateY(-50%);width:10vw;height:10vw;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--purple2));border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0.5vw 2vw rgba(108,99,255,0.35);-webkit-appearance:none;transition:transform .15s;}
+.scan-btn:active{transform:translateY(-50%) scale(0.9);}
+.scan-btn svg{width:5vw;height:5vw;color:#fff;}
+.scan-btn.scanning{background:linear-gradient(135deg,var(--red),#dc2626);animation:pulse-scan 1s ease-in-out infinite;}
+@keyframes pulse-scan{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.5);}50%{box-shadow:0 0 0 2.5vw rgba(239,68,68,0);}}
+.flt-row{display:flex;gap:2vw;overflow-x:auto;padding:3vw 0 0.5vw;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.flt-row::-webkit-scrollbar{display:none;}
+.flt-btn{flex-shrink:0;height:9vw;padding:0 4vw;border-radius:99vw;border:0.5vw solid var(--border);background:var(--white);font-family:'Nunito',sans-serif;font-size:3.2vw;font-weight:800;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .18s;-webkit-appearance:none;}
+.flt-btn:active{transform:scale(0.95);}
+.flt-btn.on{background:var(--purple);color:#fff;border-color:var(--purple);box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.3);}
+.flt-btn[data-flt="pending"].on{background:#7c3aed;border-color:#7c3aed;}
+.flt-btn[data-flt="gain"].on{background:var(--green);border-color:var(--green);box-shadow:0 0.5vw 2.5vw rgba(16,185,129,0.3);}
+.flt-btn[data-flt="loss"].on{background:var(--red);border-color:var(--red);box-shadow:0 0.5vw 2.5vw rgba(239,68,68,0.3);}
+.flt-btn[data-flt="match"].on{background:var(--navy);border-color:var(--navy);box-shadow:0 0.5vw 2.5vw rgba(37,99,235,0.3);}
+.scan-result-toast{position:fixed;top:18vw;left:50%;transform:translateX(-50%);background:rgba(16,185,129,0.97);color:#fff;padding:3vw 7vw;border-radius:99vw;font-size:4vw;font-weight:800;white-space:nowrap;display:none;z-index:700;}
+.scan-result-toast.on{display:block;animation:toastpop .25s ease;}
+@keyframes toastpop{from{transform:translateX(-50%) scale(0.85);opacity:0;}to{transform:translateX(-50%) scale(1);opacity:1;}}
+.scan-decoding{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:700;display:none;flex-direction:column;align-items:center;justify-content:center;gap:4vw;}
+.scan-decoding.on{display:flex;}
+.scan-dec-spin{width:12vw;height:12vw;border:1.2vw solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+.scan-dec-txt{color:#fff;font-size:4.5vw;font-weight:800;}
+.scan-fail{position:fixed;bottom:25vw;left:5vw;right:5vw;background:#fff;border-radius:4vw;padding:4vw 5vw;z-index:700;display:none;align-items:center;gap:3vw;box-shadow:0 2vw 8vw rgba(0,0,0,0.2);cursor:pointer;}
+.scan-fail.on{display:flex;}
+.scan-fail-ico{font-size:7vw;flex-shrink:0;}
+.scan-fail-txt{font-size:3.5vw;font-weight:700;color:var(--text);line-height:1.5;}
+.tab-pane{display:none;}
+.tab-pane.on{display:block;}
+
+/* Stats chips */
+.stats-wrap{padding:2.5vw 5vw 0;}
+.stats-row{display:flex;gap:2vw;overflow-x:auto;padding-bottom:2vw;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.stats-row::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;background:var(--white);border:0.3vw solid var(--border);border-radius:99vw;padding:2vw 4vw;font-size:3.2vw;font-weight:800;color:var(--text);white-space:nowrap;}
+.c-pu{color:var(--purple);}.c-gr{color:var(--green);}.c-re{color:var(--red);}.c-na{color:var(--navy);}
+
+/* Item cards */
+.ilist{padding:3vw 5vw 5vw;}
+.ic{background:var(--white);border:0.4vw solid var(--border);border-radius:4.5vw;padding:4.5vw;margin-bottom:3vw;cursor:pointer;box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.07);animation:fu .25s ease both;}
+@keyframes fu{from{opacity:0;transform:translateY(3vw)}to{opacity:1;transform:translateY(0)}}
+.ic:active{transform:scale(0.99);}
+.ic.done{border-left:1.5vw solid var(--green);}
+.ic.loss-s{border-left-color:var(--red);}
+.ic.match-s{border-left-color:var(--navy);}
+.itop{display:flex;justify-content:space-between;align-items:flex-start;gap:2vw;margin-bottom:1.5vw;}
+.imat{font-size:3.2vw;font-weight:800;color:var(--purple);word-break:break-all;flex:1;line-height:1.4;}
+.ibatch{font-size:3vw;font-weight:700;color:var(--muted);margin-top:0.8vw;font-family:monospace,monospace;letter-spacing:0.3px;}
+.ibatch span{color:var(--text);font-weight:800;}
+.ibdg{flex-shrink:0;font-size:2.8vw;font-weight:800;padding:1.2vw 3vw;border-radius:99vw;text-transform:uppercase;letter-spacing:.3px;}
+.bp{background:rgba(108,99,255,0.1);color:var(--purple);}
+.bg2{background:rgba(16,185,129,0.12);color:var(--green);}
+.bl{background:rgba(239,68,68,0.12);color:var(--red);}
+.bm{background:rgba(37,99,235,0.12);color:var(--navy);}
+.idesc{font-size:4vw;font-weight:700;margin-bottom:2vw;line-height:1.4;}
+.imrow{display:flex;flex-wrap:wrap;gap:2.5vw;}
+.imeta{font-size:3.2vw;color:var(--muted);font-weight:700;}
+.imeta strong{color:var(--text);}
+.qty-row{display:flex;align-items:center;margin-top:3.5vw;padding-top:3.5vw;border-top:0.4vw solid var(--border);}
+.qb{flex:1;text-align:center;}
+.ql{font-size:2.5vw;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:1vw;}
+.qv{font-family:'Nunito',sans-serif;font-size:5.5vw;font-weight:800;}
+.q1{color:var(--blue);}.q2{color:var(--purple);}.q3{color:var(--text);}
+.qdiv{width:0.3vw;height:8vw;background:var(--border);}
+.empty{text-align:center;padding:15vw 5vw;color:var(--muted);}
+.empty p{font-size:4vw;font-weight:700;margin-top:4vw;}
+
+/* Dashboard */
+.dash{padding:5vw 5vw 5vw;}
+.dsec{font-size:3vw;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3.5vw;}
+.sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3vw;margin-bottom:5vw;}
+.scard{background:var(--white);border:0.4vw solid var(--border);border-radius:4.5vw;padding:5vw 2vw;text-align:center;box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.07);}
+.sval{font-family:'Nunito',sans-serif;font-size:9vw;font-weight:800;margin-bottom:1.5vw;}
+.slbl{font-size:2.8vw;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.sv-g{color:var(--green);}.sv-l{color:var(--red);}.sv-m{color:var(--navy);}
+.prg-card{background:var(--white);border:0.4vw solid var(--border);border-radius:4.5vw;padding:5vw;margin-bottom:5vw;box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.07);}
+.prg-row{display:flex;justify-content:space-between;font-size:3.5vw;font-weight:700;color:var(--muted);margin-bottom:2.5vw;}
+.prg-bg{height:2.5vw;background:#ebebff;border-radius:99vw;overflow:hidden;}
+.prg-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--purple2));border-radius:99vw;transition:width .6s ease;}
+.prg-sub{font-size:3vw;color:var(--muted);font-weight:700;margin-top:2vw;}
+.chrt{background:var(--white);border:0.4vw solid var(--border);border-radius:4.5vw;padding:4vw;box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.07);}
+.chrt canvas{max-height:55vw;}
+
+/* ══ DOWNLOAD TAB ══ */
+.dl-page{padding:5vw 5vw calc(22vw + 5vw);}
+.dl-card{background:var(--white);border:0.4vw solid var(--border);border-radius:4.5vw;padding:5vw;margin-bottom:4vw;box-shadow:0 0.5vw 2.5vw rgba(108,99,255,0.07);}
+.dl-card-title{font-size:3.2vw;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4vw;}
+.dl-info-row{display:flex;align-items:center;gap:3vw;padding:3vw 0;border-bottom:0.3vw solid var(--border);}
+.dl-info-row:last-child{border-bottom:none;padding-bottom:0;}
+.dl-info-ico{font-size:5vw;flex-shrink:0;width:9vw;text-align:center;}
+.dl-info-content{flex:1;}
+.dl-info-label{font-size:2.8vw;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.8vw;}
+.dl-info-value{font-size:4vw;font-weight:800;color:var(--text);}
+.dl-info-value.pu{color:var(--purple);}
+.dl-stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:3vw;margin-bottom:4vw;}
+.dl-stat{background:var(--white);border:0.4vw solid var(--border);border-radius:4vw;padding:4vw 3vw;text-align:center;box-shadow:0 0.3vw 1.5vw rgba(108,99,255,0.06);}
+.dl-stat-val{font-family:'Nunito',sans-serif;font-size:8vw;font-weight:800;margin-bottom:1vw;}
+.dl-stat-lbl{font-size:2.8vw;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+.dl-btn{width:100%;height:16vw;border:none;border-radius:4vw;font-family:'Nunito',sans-serif;font-size:4.5vw;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3vw;transition:all .2s;-webkit-appearance:none;margin-bottom:4vw;}
+.dl-btn:active{transform:scale(0.97);}
+.dl-btn-main{background:linear-gradient(135deg,var(--green),#059669);color:#fff;box-shadow:0 1vw 4vw rgba(16,185,129,0.35);}
+.dl-btn-main:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.dl-btn-ico{font-size:5.5vw;}
+.dl-no-data{background:rgba(245,158,11,0.08);border:0.5vw solid rgba(245,158,11,0.3);border-radius:4vw;padding:5vw;text-align:center;margin-bottom:4vw;display:none;}
+.dl-no-data.on{display:block;}
+.dl-no-data-ico{font-size:10vw;margin-bottom:2vw;}
+.dl-no-data p{font-size:3.5vw;font-weight:700;color:#92400e;}
+.dl-success{background:rgba(16,185,129,0.08);border:0.5vw solid rgba(16,185,129,0.3);border-radius:4vw;padding:4vw;text-align:center;margin-bottom:4vw;display:none;}
+.dl-success.on{display:block;}
+.dl-success p{font-size:3.5vw;font-weight:700;color:#065f46;}
+.dl-spin{width:5vw;height:5vw;border:0.8vw solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+.dl-btn-main.loading .dl-spin{display:block;}
+.dl-btn-main.loading .dl-btn-ico{display:none;}
+.dl-note{background:#f5f6ff;border:0.4vw solid var(--border);border-radius:4vw;padding:4vw 4.5vw;}
+.dl-note-row{font-size:3vw;font-weight:700;color:var(--muted);line-height:1.7;padding:1.5vw 0;}
+.dl-note-row+.dl-note-row{border-top:0.3vw solid var(--border);}
+
+/* ══ BOTTOM NAV ══ */
+.bot-nav{position:fixed;bottom:0;left:0;right:0;height:20vw;background:#fff;border-top:0.4vw solid var(--border);display:none;justify-content:space-around;align-items:center;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
+.bot-nav.on{display:flex;}
+.nb{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:1vw;color:var(--muted);cursor:pointer;min-width:20vw;min-height:14vw;justify-content:center;-webkit-appearance:none;padding:2vw 0;}
+.nb .ico{font-size:5.5vw;}
+.nb .lbl{font-size:2.2vw;font-weight:800;letter-spacing:.5px;}
+.nb.on{color:var(--purple);}
+/* Download nav tab — aksen orange/amber */
+.nb.on#n-dl{color:var(--green);}
+
+/* ══ MODAL ══ */
+.ovl{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;display:none;align-items:flex-end;justify-content:center;}
+.ovl.on{display:flex;}
+.mbox{background:var(--white);border-radius:6vw 6vw 0 0;padding:0 0 10vw;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 -2.5vw 10vw rgba(108,99,255,0.18);-webkit-overflow-scrolling:touch;}
+.mhnd{width:11vw;height:1.2vw;background:var(--border);border-radius:99vw;margin:3.5vw auto 0;}
+.mttl{font-family:'Nunito',sans-serif;font-size:5vw;font-weight:800;padding:4.5vw 6vw;border-bottom:0.4vw solid var(--border);}
+.mbdy{padding:4.5vw 6vw 0;}
+.minf{background:#f5f6ff;border:0.4vw solid var(--border);border-radius:3.5vw;padding:4vw;margin-bottom:5vw;}
+.mm{font-size:3vw;font-weight:800;color:var(--purple);margin-bottom:0.8vw;}
+.mbatch{font-size:3vw;font-weight:700;color:var(--muted);margin-bottom:1.5vw;font-family:monospace,monospace;letter-spacing:0.3px;}
+.mbatch span{color:var(--text);font-weight:800;}
+.md{font-size:4.2vw;font-weight:700;margin-bottom:2vw;line-height:1.4;}
+.ml{font-size:3.5vw;color:var(--muted);font-weight:700;}
+.mqr{display:flex;gap:3vw;margin-bottom:5vw;}
+.mqb{flex:1;background:#f5f6ff;border:0.4vw solid var(--border);border-radius:3.5vw;padding:3.5vw;text-align:center;}
+.mqr-single{display:flex;justify-content:center;margin-bottom:5vw;}
+.mqb-single{background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(108,99,255,0.06));border:0.5vw solid rgba(14,165,233,0.3);border-radius:4vw;padding:4vw 8vw;text-align:center;min-width:50vw;}
+.mql{font-size:2.8vw;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:1.5vw;}
+.mqv{font-family:'Nunito',sans-serif;font-size:7vw;font-weight:800;}
+.mf{margin-bottom:4.5vw;}
+.mf label{display:block;font-size:3vw;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2.5vw;}
+.minp{width:100%;height:14vw;padding:0 4.5vw;border-radius:3.5vw;border:0.5vw solid var(--border);background:#f5f6ff;font-family:'Nunito',sans-serif;font-size:4vw;color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;-moz-appearance:textfield;}
+.minp::-webkit-inner-spin-button,.minp::-webkit-outer-spin-button{-webkit-appearance:none;}
+.minp:focus{border-color:var(--purple);box-shadow:0 0 0 1vw rgba(108,99,255,0.15);background:#fff;}
+.sor{display:flex;gap:2.5vw;margin-bottom:5vw;}
+.so{flex:1;height:14vw;border:0.5vw solid var(--border);border-radius:3.5vw;background:#f5f6ff;cursor:pointer;font-family:'Nunito',sans-serif;font-size:3.8vw;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .18s;-webkit-appearance:none;gap:1vw;}
+.so:active{transform:scale(0.96);}
+.sg{border-color:var(--green)!important;background:rgba(16,185,129,0.1)!important;color:var(--green)!important;}
+.sl{border-color:var(--red)!important;background:rgba(239,68,68,0.1)!important;color:var(--red)!important;}
+.sm{border-color:var(--navy)!important;background:rgba(37,99,235,0.1)!important;color:var(--navy)!important;}
+.save-ok{display:none;background:rgba(16,185,129,0.1);border:0.5vw solid rgba(16,185,129,0.3);border-radius:3vw;padding:3.5vw;font-size:3.8vw;font-weight:700;color:var(--green);text-align:center;margin-bottom:4vw;}
+.save-ok.on{display:block;}
+.save-btn{width:100%;height:14vw;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:none;border-radius:3.5vw;font-family:'Nunito',sans-serif;font-size:4.5vw;font-weight:700;cursor:pointer;box-shadow:0 1vw 4vw rgba(108,99,255,0.32);-webkit-appearance:none;}
+.save-btn:active{transform:scale(0.97);}
+.save-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+/* ══ PWA INSTALL BANNER ══ */
+.install-banner{position:fixed;bottom:22vw;left:4vw;right:4vw;z-index:200;background:linear-gradient(135deg,var(--purple),var(--purple2));border-radius:4vw;padding:4vw 5vw;display:none;align-items:center;gap:3vw;box-shadow:0 2vw 8vw rgba(108,99,255,0.45);animation:slideup .4s ease;}
+.install-banner.on{display:flex;}
+@keyframes slideup{from{transform:translateY(10vw);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.install-banner-ico{font-size:8vw;flex-shrink:0;}
+.install-banner-txt{flex:1;}
+.install-banner-title{font-size:3.8vw;font-weight:800;color:#fff;margin-bottom:0.8vw;}
+.install-banner-sub{font-size:3vw;color:rgba(255,255,255,0.85);font-weight:700;}
+.install-banner-btns{display:flex;flex-direction:column;gap:2vw;flex-shrink:0;}
+.install-yes{background:#fff;color:var(--purple);border:none;border-radius:3vw;padding:2.5vw 4vw;font-family:'Nunito',sans-serif;font-size:3.2vw;font-weight:800;cursor:pointer;white-space:nowrap;}
+.install-no{background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:3vw;padding:2vw 4vw;font-family:'Nunito',sans-serif;font-size:2.8vw;font-weight:700;cursor:pointer;white-space:nowrap;}
+
+/* Install guide overlay */
+.install-guide-ovl{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:800;display:none;align-items:flex-end;justify-content:center;}
+.install-guide-ovl.on{display:flex;}
+.install-guide-sheet{background:#fff;border-radius:6vw 6vw 0 0;padding:6vw 6vw 12vw;width:100%;}
+.install-guide-hnd{width:11vw;height:1.2vw;background:var(--border);border-radius:99vw;margin:0 auto 5vw;}
+.install-guide-title{font-size:5vw;font-weight:800;color:var(--text);margin-bottom:4vw;text-align:center;}
+.install-step{display:flex;align-items:flex-start;gap:4vw;margin-bottom:5vw;}
+.install-step-num{width:8vw;height:8vw;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;font-size:4vw;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.install-step-txt{flex:1;font-size:3.8vw;font-weight:700;color:var(--text);line-height:1.5;padding-top:1vw;}
+.install-step-txt span{color:var(--purple);font-weight:800;}
+.install-guide-close{width:100%;height:13vw;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:none;border-radius:3.5vw;font-family:'Nunito',sans-serif;font-size:4.5vw;font-weight:700;cursor:pointer;margin-top:2vw;}
+
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loader"><div class="spin"></div><p id="ldrtxt">Loading...</p></div>
+
+<!-- ══ LOGIN ══ -->
+<div id="s-login" class="on">
+  <div class="login-body">
+    <div class="login-title">Cycle Counting</div>
+    <div class="login-sub">Satellite Store</div>
+    <div class="login-slogan">Simplify Counting, Maximize Accuracy</div>
+    <div class="login-card">
+      <div class="login-err" id="loginErr">Please enter both username and ID.</div>
+      <div class="inp-wrap">
+        <input type="text" id="inUser" placeholder="Username" autocomplete="off">
+      </div>
+      <div class="inp-wrap">
+        <input type="password" id="inId" placeholder="ID" autocomplete="off">
+        <button class="eye-btn" onclick="toggleEye()" type="button">
+          <svg id="eyeIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <button class="login-btn" onclick="doLogin()">Sign In →</button>
+    </div>
+  </div>
+  <div class="ticker-box">
+    <div class="ticker-track">
+      <span class="ticker-item">⚡ Cycle Counting System &nbsp;·&nbsp; Satellite Store &nbsp;·&nbsp; <span class="hl">Simplify Counting, Maximize Accuracy</span> &nbsp;·&nbsp; © 2026 All rights reserved &nbsp;·&nbsp; <span class="hl">@ms.brms2026</span> &nbsp;·&nbsp; Real-time stock verification &nbsp;·&nbsp;</span><span class="ticker-item">⚡ Cycle Counting System &nbsp;·&nbsp; Satellite Store &nbsp;·&nbsp; <span class="hl">Simplify Counting, Maximize Accuracy</span> &nbsp;·&nbsp; © 2026 All rights reserved &nbsp;·&nbsp; <span class="hl">@ms.brms2026</span> &nbsp;·&nbsp; Real-time stock verification &nbsp;·&nbsp;</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="s-app">
+
+  <!-- Header -->
+  <div class="app-header">
+    <button class="back-btn" id="hBack" onclick="goSelect()">
+      <span class="arr">&#8592;</span>
+      <span class="lbl">Back</span>
+    </button>
+    <div class="hdr-title" id="hTitle">Cycle Counting</div>
+    <button class="logout-btn" onclick="doLogout()" title="Logout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+        <line x1="12" y1="2" x2="12" y2="12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- SELECT PAGE -->
+  <div class="page on" id="p-sel">
+    <div class="sel-title">Select Plant &amp; Date</div>
+    <div class="sel-sub">Choose area and date to start</div>
+    <span class="sec-lbl">Plant</span>
+    <div class="plant-grid">
+      <div class="plant-card" data-plant="HG2" data-code="GAH2" onclick="selPlant(this)">
+        <div class="p-badge" id="cnt-HG2">—</div>
+        <div class="p-code">HG2</div><div class="p-name">Plant HG2</div>
+      </div>
+      <div class="plant-card" data-plant="HG3" data-code="GAH3" onclick="selPlant(this)">
+        <div class="p-badge" id="cnt-HG3">—</div>
+        <div class="p-code">HG3</div><div class="p-name">Plant HG3</div>
+      </div>
+      <div class="plant-card" data-plant="HG4" data-code="GAH4" onclick="selPlant(this)">
+        <div class="p-badge" id="cnt-HG4">—</div>
+        <div class="p-code">HG4</div><div class="p-name">Plant HG4</div>
+      </div>
+      <div class="plant-card" data-plant="Apron" data-code="GApron" onclick="selPlant(this)">
+        <div class="p-badge" id="cnt-Apron">—</div>
+        <div class="p-code">Apron</div><div class="p-name">Apron Area</div>
+      </div>
+    </div>
+    <span class="sec-lbl">Counting Date</span>
+    <input type="date" class="date-inp" id="inDate">
+    <div class="alert alert-red" id="alertPlant">⚠️ <strong>Plant not found in database.</strong><br>No data yet. Please ask administrator to input data first.</div>
+    <div class="alert alert-blue" id="alertDate">📅 <strong>No data for this date.</strong><br>Not updated yet. Please contact your administrator.</div>
+    <button class="main-btn" id="btnGo" onclick="doProceed()" disabled>View Counting List →</button>
+  </div>
+
+  <!-- MAIN PAGE -->
+  <div class="page" id="p-main">
+
+    <!-- Sub-header -->
+    <div class="sub-header">
+      <div class="sub-meta" id="hMeta">—</div>
+    </div>
+
+    <!-- LIST TAB -->
+    <div class="tab-pane on" id="tc-list">
+      <div class="list-search" style="padding:3vw 5vw 0;">
+        <div class="srch-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" class="srch-inp" placeholder="Search material, batch, location..." id="searchIn" oninput="renderList()">
+          <button class="scan-btn" onclick="openScanner()" title="Scan Barcode / QR">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+              <line x1="12" y1="8" x2="12" y2="16"/>
+            </svg>
+          </button>
+        </div>
+        <div class="flt-row">
+          <button class="flt-btn on" data-flt="all"     onclick="setFlt(this)">All</button>
+          <button class="flt-btn"    data-flt="pending" onclick="setFlt(this)">⏳ Pending</button>
+          <button class="flt-btn"    data-flt="gain"    onclick="setFlt(this)">📈 Gain</button>
+          <button class="flt-btn"    data-flt="loss"    onclick="setFlt(this)">📉 Loss</button>
+          <button class="flt-btn"    data-flt="match"   onclick="setFlt(this)">✅ Match</button>
+        </div>
+      </div>
+      <div class="stats-wrap">
+        <div class="stats-row" id="statsRow"></div>
+      </div>
+      <div class="ilist" id="ilist"></div>
+    </div>
+
+    <!-- DASHBOARD TAB -->
+    <div class="tab-pane" id="tc-dash">
+      <div class="dash">
+        <div class="dsec">Today's Summary</div>
+        <div class="sum-grid">
+          <div class="scard"><div class="sval sv-g" id="d-g">0</div><div class="slbl">Gain</div></div>
+          <div class="scard"><div class="sval sv-l" id="d-l">0</div><div class="slbl">Loss</div></div>
+          <div class="scard"><div class="sval sv-m" id="d-m">0</div><div class="slbl">Match</div></div>
+        </div>
+        <div class="prg-card">
+          <div class="prg-row"><span>Completion</span><span id="d-pct">0%</span></div>
+          <div class="prg-bg"><div class="prg-fill" id="d-fill" style="width:0%"></div></div>
+          <div class="prg-sub" id="d-sub">0 of 0 items</div>
+        </div>
+        <div class="dsec">7-Day Trend</div>
+        <div class="chrt"><canvas id="tChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- DOWNLOAD TAB -->
+    <div class="tab-pane" id="tc-dl">
+      <div class="dl-page">
+
+        <!-- Active filter info -->
+        <div class="dl-card">
+          <div class="dl-card-title">Active Filter</div>
+          <div class="dl-info-row">
+            <div class="dl-info-ico">🏭</div>
+            <div class="dl-info-content">
+              <div class="dl-info-label">Plant</div>
+              <div class="dl-info-value pu" id="dl-plant-val">—</div>
+            </div>
+          </div>
+          <div class="dl-info-row">
+            <div class="dl-info-ico">📅</div>
+            <div class="dl-info-content">
+              <div class="dl-info-label">Date</div>
+              <div class="dl-info-value pu" id="dl-date-val">—</div>
+            </div>
+          </div>
+          <div class="dl-info-row">
+            <div class="dl-info-ico">👤</div>
+            <div class="dl-info-content">
+              <div class="dl-info-label">User</div>
+              <div class="dl-info-value" id="dl-user-val">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats preview -->
+        <div class="dl-stat-grid">
+          <div class="dl-stat">
+            <div class="dl-stat-val" id="dl-total" style="color:var(--purple)">0</div>
+            <div class="dl-stat-lbl">Total Items</div>
+          </div>
+          <div class="dl-stat">
+            <div class="dl-stat-val" id="dl-done" style="color:var(--green)">0</div>
+            <div class="dl-stat-lbl">Counted</div>
+          </div>
+          <div class="dl-stat">
+            <div class="dl-stat-val" id="dl-pending" style="color:var(--orange)">0</div>
+            <div class="dl-stat-lbl">Pending</div>
+          </div>
+          <div class="dl-stat">
+            <div class="dl-stat-val" id="dl-pct" style="color:var(--navy)">0%</div>
+            <div class="dl-stat-lbl">Completion</div>
+          </div>
+        </div>
+
+        <!-- No data warning -->
+        <div class="dl-no-data" id="dlNoData">
+          <div class="dl-no-data-ico">⚠️</div>
+          <p>No data available for the selected plant &amp; date.<br>Please go back to the Plant page and choose a valid filter.</p>
+        </div>
+
+        <!-- Success toast -->
+        <div class="dl-success" id="dlSuccess">
+          <p>✅ File downloaded successfully!<br><span id="dlSuccessName" style="font-family:monospace;font-size:3.2vw;"></span></p>
+        </div>
+
+        <!-- Download button -->
+        <button class="dl-btn dl-btn-main" id="btnDownload" onclick="doDownload()">
+          <div class="dl-spin"></div>
+          <span class="dl-btn-ico">⬇️</span>
+          <span id="dl-btn-txt">Download Excel (.xlsx)</span>
+        </button>
+
+        <!-- Info note -->
+        <div class="dl-note">
+          <div class="dl-note-row">📄 The downloaded data includes all columns from the KKP sheet (columns A–U), filtered by the selected plant and date.</div>
+          <div class="dl-note-row">💾 The file will be saved to your device's default download folder.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV — 4 tab: Plant, List, Dashboard, Download -->
+  <nav class="bot-nav" id="botNav">
+    <button class="nb on" id="n-sel" onclick="goSelect()">
+      <span class="ico">🏭</span><span class="lbl">PLANT</span>
+    </button>
+    <button class="nb" id="n-list" onclick="switchTab('list')">
+      <span class="ico">📋</span><span class="lbl">LIST</span>
+    </button>
+    <button class="nb" id="n-dash" onclick="switchTab('dash')">
+      <span class="ico">📊</span><span class="lbl">DASHBOARD</span>
+    </button>
+    <button class="nb" id="n-dl" onclick="switchTab('dl')">
+      <span class="ico">📥</span><span class="lbl">DOWNLOAD</span>
+    </button>
+  </nav>
+
+  <!-- INSTALL BANNER -->
+  <div class="install-banner" id="installBanner">
+    <div class="install-banner-ico">&#x1F4F1;</div>
+    <div class="install-banner-txt">
+      <div class="install-banner-title">Install as App</div>
+      <div class="install-banner-sub">Add to home screen for easier access &amp; camera permission</div>
+    </div>
+    <div class="install-banner-btns">
+      <button class="install-yes" onclick="showInstallGuide()">Install</button>
+      <button class="install-no"  onclick="dismissInstall()">Later</button>
+    </div>
+  </div>
+
+  <!-- INSTALL GUIDE SHEET -->
+  <div class="install-guide-ovl" id="installGuideOvl">
+    <div class="install-guide-sheet">
+      <div class="install-guide-hnd"></div>
+      <div class="install-guide-title">&#x1F4F2; Add to Home Screen</div>
+
+      <div class="install-step">
+        <div class="install-step-num">1</div>
+        <div class="install-step-txt">
+          Tap the <span>&#x22EE; menu (3 dots)</span> in the top-right corner of Chrome
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">2</div>
+        <div class="install-step-txt">
+          Tap <span>"Add to Home screen"</span> or <span>"Install app"</span>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">3</div>
+        <div class="install-step-txt">
+          Tap <span>"Add"</span> or <span>"Install"</span> to confirm
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">4</div>
+        <div class="install-step-txt">
+          Open the app from your home screen &rarr; go to <span>HP Settings &rarr; Apps &rarr; Chrome &rarr; Permissions &rarr; Camera &rarr; Allow</span>
+        </div>
+      </div>
+
+      <button class="install-guide-close" onclick="closeInstallGuide()">Got it &#x2713;</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- SCANNER -->
+<input type="file" id="scanFileInput" accept="image/*" capture="environment" style="display:none;" onchange="onScanFile(event)">
+<div class="scan-result-toast" id="scanToast"></div>
+<div class="scan-decoding" id="scanDecoding">
+  <div class="scan-dec-spin"></div>
+  <div class="scan-dec-txt">Decoding...</div>
+</div>
+<div class="scan-fail" id="scanFail" onclick="this.classList.remove('on')">
+  <div class="scan-fail-ico">&#x26A0;</div>
+  <div class="scan-fail-txt" id="scanFailTxt">No barcode detected. Tap to try again.</div>
+</div>
+
+<!-- MODAL -->
+<div class="ovl" id="ovl" onclick="closeOuter(event)">
+  <div class="mbox">
+    <div class="mhnd"></div>
+    <div class="mttl">Count Item</div>
+    <div class="mbdy">
+      <div class="minf">
+        <div class="mm" id="mMat"></div>
+        <div class="mbatch" id="mBatch"></div>
+        <div class="md" id="mDesc"></div>
+        <div class="ml" id="mLoc"></div>
+      </div>
+      <div class="mqr-single">
+        <div class="mqb-single">
+          <div class="mql">System Qty (MB52)</div>
+          <div class="mqv" id="mSys" style="color:var(--blue)">—</div>
+        </div>
+      </div>
+      <div class="mf">
+        <label>Qty Actual (Physical Count)</label>
+        <input type="number" class="minp" id="mQty" placeholder="Enter actual qty..." min="0" inputmode="numeric" oninput="autoSt()">
+      </div>
+      <div class="mf">
+        <label>Status</label>
+        <div class="sor">
+          <div class="so" id="sG" onclick="setSt('Gain')">📈 Gain</div>
+          <div class="so" id="sL" onclick="setSt('Loss')">📉 Loss</div>
+          <div class="so" id="sM" onclick="setSt('Match')">✅ Match</div>
+        </div>
+      </div>
+      <div class="mf">
+        <label>Remarks</label>
+        <input type="text" class="minp" id="mRem" placeholder="Optional notes...">
+      </div>
+      <div class="save-ok" id="saveOk">✓ Saved to spreadsheet!</div>
+      <button class="save-btn" id="btnSave" onclick="doSave()">Save Entry ✓</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Global error catcher \u2014 tangkap error JS yang memblokir login
+window.onerror = function(msg, src, line, col, err){
+  console.error('JS Error:', msg, 'line:', line);
+  // Jangan sembunyikan error, tapi juga jangan crash UI
+  return false;
+};
+
+// ======================================================
+// GANTI URL INI dengan URL deployment Google Apps Script
+// Cara dapat URL: Apps Script → Deploy → Manage deployments → copy URL
+// ======================================================
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbw29gNeYpfBjw1hu8d4Tp_Z57Ipq7edi7kEf6zRH7im6Azh7kHH8EmD7HjrJFvd6h37/exec';
+// ======================================================
+
+var cUser='',cPlant='',cCode='',cDate='';
+var allData=[],pageItems=[],cRow=null,cSt='',cMb52=0,tChart=null,cFlt='all';
+
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    document.getElementById('inDate').value=new Date().toISOString().split('T')[0];
+  }catch(e){ console.error('inDate init error:',e); }
+});
+
+function fmtD(d){if(!d)return '';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function setLoad(v,t){document.getElementById('loader').classList.toggle('on',v);if(t)document.getElementById('ldrtxt').textContent=t;}
+function hideAlerts(){document.getElementById('alertPlant').classList.remove('on');document.getElementById('alertDate').classList.remove('on');}
+
+function showLogin(){document.getElementById('s-login').classList.add('on');document.getElementById('s-app').classList.remove('on');document.getElementById('botNav').classList.remove('on');}
+function showApp(){document.getElementById('s-login').classList.remove('on');document.getElementById('s-app').classList.add('on');document.getElementById('botNav').classList.add('on');}
+function showPage(id){document.querySelectorAll('#s-app .page').forEach(function(p){p.classList.remove('on');});document.getElementById(id).classList.add('on');}
+
+function toggleEye(){
+  var i=document.getElementById('inId'),ico=document.getElementById('eyeIco');
+  if(i.type==='password'){i.type='text';ico.innerHTML='<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';}
+  else{i.type='password';ico.innerHTML='<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';}
+}
+
+/* ── GAS API helpers ── */
+function gasGet(action, params){
+  var url = GAS_URL + '?action=' + action;
+  if(params){ Object.keys(params).forEach(function(k){ url += '&'+k+'='+encodeURIComponent(params[k]); }); }
+  return fetch(url).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(j){
+    if(!j.success) throw new Error(j.error||'GAS error');
+    return j.data;
+  });
+}
+function gasPost(body){
+  return fetch(GAS_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(j){
+    if(!j.success) throw new Error(j.error||'GAS error');
+    return j.data;
+  });
+}
+
+function doLogin(){
+  try{
+    var u=document.getElementById('inUser').value.trim();
+    var p=document.getElementById('inId').value.trim();
+    var e=document.getElementById('loginErr');
+    if(!u||!p){e.classList.add('on');return;}
+    e.classList.remove('on');cUser=u;
+    setLoad(true,'Loading database...');
+
+    if(!GAS_URL||GAS_URL==='GANTI_DENGAN_URL_GAS_KAMU'){
+      setLoad(false);
+      alert('GAS_URL belum diisi!\nBuka file index.html dan ganti GAS_URL dengan URL deployment Apps Script kamu.');
+      return;
+    }
+    gasGet('getData').then(function(data){
+      try{
+        allData=data;buildCounts();setLoad(false);
+        showApp();showPage('p-sel');
+        document.getElementById('hTitle').textContent='Cycle Counting';
+        document.getElementById('hBack').classList.remove('on');
+        setNav('sel');
+      }catch(err){
+        setLoad(false);
+        alert('Login success but render error:\n'+err.message);
+      }
+    }).catch(function(err){
+      setLoad(false);
+      alert('getData() failed:\n'+err.message);
+    });
+  }catch(ex){
+    setLoad(false);
+    alert('doLogin error:\n'+ex.message);
+  }
+}
+document.getElementById('inUser').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+document.getElementById('inId').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+
+function doLogout(){
+  cUser='';cPlant='';cCode='';cDate='';allData=[];pageItems=[];
+  document.getElementById('inUser').value='';document.getElementById('inId').value='';
+  document.querySelectorAll('.plant-card').forEach(function(c){c.classList.remove('sel');});
+  hideAlerts();showLogin();
+}
+
+function buildCounts(){
+  document.querySelectorAll('.plant-card').forEach(function(c){
+    var code=c.dataset.code,plant=c.dataset.plant;
+    var n=allData.filter(function(r){return r.plant===code;}).length;
+    var el=document.getElementById('cnt-'+plant);
+    if(el){el.textContent=n>0?n:'\u2014';el.classList.toggle('has',n>0);}
+  });
+}
+
+function selPlant(el){
+  document.querySelectorAll('.plant-card').forEach(function(c){c.classList.remove('sel');});
+  el.classList.add('sel');cPlant=el.dataset.plant;cCode=el.dataset.code;hideAlerts();checkGo();
+}
+document.getElementById('inDate').addEventListener('change',function(){hideAlerts();checkGo();});
+function checkGo(){var d=document.getElementById('inDate').value;document.getElementById('btnGo').disabled=!(cPlant&&d);}
+
+function doProceed(){
+  var d=document.getElementById('inDate').value;
+  if(!cPlant||!d)return;
+  cDate=d;hideAlerts();
+  var pa=allData.filter(function(r){return r.plant===cCode;});
+  if(!pa.length){document.getElementById('alertPlant').classList.add('on');return;}
+  var items=allData.filter(function(r){return r.plant===cCode&&r.date===cDate;});
+  if(!items.length){document.getElementById('alertDate').classList.add('on');return;}
+  pageItems=items;
+  document.getElementById('hMeta').textContent=fmtD(d)+' \u00b7 '+items.length+' items \u00b7 '+cUser;
+  document.getElementById('hTitle').textContent='Plant '+cPlant;
+  document.getElementById('hBack').classList.add('on');
+  cFlt='all';document.querySelectorAll('.flt-btn').forEach(function(b){b.classList.toggle('on',b.dataset.flt==='all');});
+  showPage('p-main');renderList();updateDash();updateDlTab();switchTab('list');
+}
+
+function goSelect(){
+  setLoad(true,'Syncing...');
+  gasGet('getData').then(function(data){
+    allData=data;buildCounts();setLoad(false);
+    pageItems=allData.filter(function(r){return r.plant===cCode&&r.date===cDate;});
+    showPage('p-sel');
+    document.getElementById('hTitle').textContent='Cycle Counting';
+    document.getElementById('hBack').classList.remove('on');
+    setNav('sel');
+  }).catch(function(){ setLoad(false); showPage('p-sel'); });
+}
+
+function setNav(t){
+  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
+  var m={'sel':'n-sel','list':'n-list','dash':'n-dash','dl':'n-dl'};
+  if(m[t])document.getElementById(m[t]).classList.add('on');
+}
+
+function switchTab(t){
+  document.getElementById('tc-list').classList.toggle('on',t==='list');
+  document.getElementById('tc-dash').classList.toggle('on',t==='dash');
+  document.getElementById('tc-dl').classList.toggle('on',t==='dl');
+  if(t==='dash')updateDash();
+  if(t==='dl')updateDlTab();
+  setNav(t);
+}
+
+// Fungsi format batch: pastikan 10 karakter, leading zero dipertahankan
+function fmtBatch(raw){
+  if(!raw||raw===''||raw==='undefined'||raw==='null')return '';
+  var s=String(raw).replace(/\.0+$/,'').trim();
+  if(s==='')return '';
+  while(s.length<10)s='0'+s;
+  return s;
+}
+
+function setFlt(el){
+  cFlt=el.dataset.flt;
+  document.querySelectorAll('.flt-btn').forEach(function(b){b.classList.remove('on');});
+  el.classList.add('on');
+  renderList();
+}
+
+function renderList(){
+  var q=document.getElementById('searchIn').value.toLowerCase();
+  var shown=pageItems.filter(function(i){
+    // Text search
+    var matchQ=!q||(i.material.toLowerCase().includes(q)||
+           i.description.toLowerCase().includes(q)||
+           i.locLX02.toLowerCase().includes(q)||
+           (i.batch&&fmtBatch(i.batch).includes(q)));
+    // Status filter
+    var st=i.status?i.status.toLowerCase():'pending';
+    var matchF=(cFlt==='all')||
+               (cFlt==='pending'&&!i.status)||
+               (cFlt!=='all'&&cFlt!=='pending'&&st===cFlt);
+    return matchQ&&matchF;
+  });
+  var done=0,g=0,l=0,m=0;
+  pageItems.forEach(function(i){if(!i.status)return;done++;var s=i.status.toLowerCase();if(s==='gain')g++;else if(s==='loss')l++;else m++;});
+  document.getElementById('statsRow').innerHTML=
+    '<div class="chip">Pending: <span class="c-pu">'+(pageItems.length-done)+'</span></div>'+
+    '<div class="chip">Done: <span class="c-gr">'+done+'</span></div>'+
+    '<div class="chip">Gain: <span class="c-gr">'+g+'</span></div>'+
+    '<div class="chip">Loss: <span class="c-re">'+l+'</span></div>'+
+    '<div class="chip">Match: <span class="c-na">'+m+'</span></div>';
+  if(!shown.length){
+    document.getElementById('ilist').innerHTML='<div class="empty"><svg width="12vw" height="12vw" style="opacity:.3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><p>No items found</p></div>';
+    return;
+  }
+  document.getElementById('ilist').innerHTML=shown.map(function(item,idx){
+    var isDone=!!item.status,sk=isDone?item.status.toLowerCase():'p';
+    var bc=isDone?(sk==='gain'?'bg2':(sk==='loss'?'bl':'bm')):'bp';
+    var bt=isDone?item.status:'Pending';
+    var dc=isDone?'done '+(sk==='loss'?'loss-s':sk==='match'?'match-s':''):'';
+    var aq=(item.qtyActual!==null&&item.qtyActual!==undefined)?item.qtyActual:'\u2014';
+    var batchStr=fmtBatch(item.batch);
+    var batchHtml=batchStr?'<div class="ibatch">Batch: <span>'+batchStr+'</span></div>':'';
+    return '<div class="ic '+dc+'" onclick="openModal('+item.row+')" style="animation-delay:'+Math.min(idx*0.025,0.4)+'s">'+
+      '<div class="itop">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div class="imat">'+item.material+'</div>'+
+          batchHtml+
+        '</div>'+
+        '<span class="ibdg '+bc+'">'+bt+'</span>'+
+      '</div>'+
+      '<div class="idesc">'+(item.description||'\u2014')+'</div>'+
+      '<div class="imrow">'+
+        '<span class="imeta">\ud83d\udccd <strong>'+(item.locLX02||'\u2014')+'</strong></span>'+
+        '<span class="imeta">Unit: <strong>'+(item.aun||'\u2014')+'</strong></span>'+
+      '</div>'+
+      '<div class="qty-row">'+
+        '<div class="qb"><div class="ql">System (MB52)</div><div class="qv q1">'+(item.mb52!==null?item.mb52:'\u2014')+'</div></div>'+
+        '<div class="qdiv"></div>'+
+        '<div class="qb"><div class="ql">Actual Count</div><div class="qv q2">'+aq+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function openModal(row){
+  cRow=row;cSt='';
+  var item=allData.find(function(r){return r.row===row;});
+  if(!item)return;cMb52=item.mb52;
+  document.getElementById('mMat').textContent=item.material;
+  var batchDisplay=fmtBatch(item.batch);
+  var batchEl=document.getElementById('mBatch');
+  if(batchDisplay){batchEl.innerHTML='Batch: <span>'+batchDisplay+'</span>';batchEl.style.display='block';}
+  else{batchEl.style.display='none';}
+  document.getElementById('mDesc').textContent=item.description;
+  document.getElementById('mLoc').textContent='\ud83d\udccd '+(item.locLX02||'\u2014')+' \u00b7 '+(item.plant||'\u2014')+' \u00b7 '+(item.aun||'\u2014');
+  document.getElementById('mSys').textContent=item.mb52!==null?item.mb52:'\u2014';
+  document.getElementById('mQty').value=(item.qtyActual!==null&&item.qtyActual!==undefined)?item.qtyActual:'';
+  document.getElementById('mRem').value=item.remarks||'';
+  document.getElementById('saveOk').classList.remove('on');
+  document.getElementById('btnSave').disabled=false;
+  document.getElementById('btnSave').textContent='Save Entry \u2713';
+  if(item.status)setSt(item.status);
+  else{['sG','sL','sM'].forEach(function(id){document.getElementById(id).className='so';});cSt='';}
+  document.getElementById('ovl').classList.add('on');
+}
+function closeOuter(e){if(e.target===document.getElementById('ovl'))closeModal();}
+function closeModal(){document.getElementById('ovl').classList.remove('on');}
+function setSt(s){
+  cSt=s;
+  document.getElementById('sG').className='so'+(s==='Gain'?' sg':'');
+  document.getElementById('sL').className='so'+(s==='Loss'?' sl':'');
+  document.getElementById('sM').className='so'+(s==='Match'?' sm':'');
+}
+function autoSt(){
+  var v=parseFloat(document.getElementById('mQty').value);if(isNaN(v))return;
+  var sys=parseFloat(cMb52);
+  if(!isNaN(sys)){if(v>sys)setSt('Gain');else if(v<sys)setSt('Loss');else setSt('Match');}
+}
+function doSave(){
+  var qs=document.getElementById('mQty').value;
+  if(qs===''){alert('Please enter actual quantity.');return;}
+  if(!cSt){alert('Please select status: Gain, Loss, or Match.');return;}
+  var qty=parseFloat(qs),rem=document.getElementById('mRem').value.trim();
+  document.getElementById('btnSave').disabled=true;document.getElementById('btnSave').textContent='Saving...';
+  gasPost({rowIndex:cRow,qtyActual:qty,status:cSt,remarks:rem,pic:cUser}).then(function(){
+    [allData,pageItems].forEach(function(arr){
+      var it=arr.find(function(r){return r.row===cRow;});
+      if(it){it.qtyActual=qty;it.status=cSt;it.remarks=rem;it.date=cDate;it.pic=cUser;}
+    });
+    document.getElementById('saveOk').classList.add('on');
+    document.getElementById('btnSave').textContent='Save Entry \u2713';
+    document.getElementById('btnSave').disabled=false;
+    renderList();updateDash();updateDlTab();setTimeout(closeModal,1100);
+  }).catch(function(err){
+    alert('Save failed:\n'+err.message);
+    document.getElementById('btnSave').textContent='Save Entry \u2713';
+    document.getElementById('btnSave').disabled=false;
+  });
+}
+
+function updateDash(){
+  var g=0,l=0,m=0,done=0;
+  pageItems.forEach(function(it){if(!it.status)return;done++;var s=it.status.toLowerCase();if(s==='gain')g++;else if(s==='loss')l++;else m++;});
+  document.getElementById('d-g').textContent=g;document.getElementById('d-l').textContent=l;document.getElementById('d-m').textContent=m;
+  var pct=pageItems.length>0?Math.round(done/pageItems.length*100):0;
+  document.getElementById('d-pct').textContent=pct+'%';
+  document.getElementById('d-fill').style.width=pct+'%';
+  document.getElementById('d-sub').textContent=done+' of '+pageItems.length+' items counted';
+  renderTrend();
+}
+
+function renderTrend(){
+  var ctx=document.getElementById('tChart').getContext('2d');
+  var byDate={};
+  allData.filter(function(r){return r.plant===cCode&&r.status&&r.date;})
+    .forEach(function(r){if(!byDate[r.date])byDate[r.date]={g:0,l:0,m:0};var s=r.status.toLowerCase();if(s==='gain')byDate[r.date].g++;else if(s==='loss')byDate[r.date].l++;else byDate[r.date].m++;});
+  var labels=[],gD=[],lD=[],mD=[];
+  for(var i=6;i>=0;i--){
+    var d=new Date();d.setDate(d.getDate()-i);
+    var key=d.toISOString().split('T')[0];
+    labels.push(d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+    var day=byDate[key]||{g:0,l:0,m:0};gD.push(day.g);lD.push(day.l);mD.push(day.m);
+  }
+  if(tChart)tChart.destroy();
+  tChart=new Chart(ctx,{type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'Gain',data:gD,backgroundColor:'rgba(16,185,129,.75)',borderRadius:4},
+      {label:'Loss',data:lD,backgroundColor:'rgba(239,68,68,.75)',borderRadius:4},
+      {label:'Match',data:mD,backgroundColor:'rgba(37,99,235,.75)',borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{labels:{color:'#8b8fba',font:{size:11},boxWidth:12}}},
+      scales:{x:{stacked:true,grid:{color:'rgba(108,99,255,.06)'},ticks:{color:'#8b8fba',font:{size:10}}},
+              y:{stacked:true,grid:{color:'rgba(108,99,255,.06)'},ticks:{color:'#8b8fba',font:{size:10}}}}}
+  });
+}
+
+/* \u2550\u2550 DOWNLOAD TAB LOGIC \u2550\u2550 */
+
+// Update info di tab download setiap kali pageItems berubah
+function updateDlTab(){
+  var total=pageItems.length;
+  var done=pageItems.filter(function(r){return !!r.status;}).length;
+  var pending=total-done;
+  var pct=total>0?Math.round(done/total*100):0;
+
+  document.getElementById('dl-plant-val').textContent=cPlant?('Plant '+cPlant+' ('+cCode+')'):'\u2014';
+  document.getElementById('dl-date-val').textContent=cDate?fmtD(cDate):'\u2014';
+  document.getElementById('dl-user-val').textContent=cUser||'\u2014';
+  document.getElementById('dl-total').textContent=total;
+  document.getElementById('dl-done').textContent=done;
+  document.getElementById('dl-pending').textContent=pending;
+  document.getElementById('dl-pct').textContent=pct+'%';
+
+  // Tampilkan warning jika tidak ada data
+  document.getElementById('dlNoData').classList.toggle('on',total===0);
+  document.getElementById('btnDownload').disabled=(total===0);
+  document.getElementById('dlSuccess').classList.remove('on');
+}
+
+// Fungsi utama download \u2014 panggil Apps Script getDownloadData, lalu build XLSX
+function doDownload(){
+  if(!cCode||!cDate){alert('Pilih plant dan tanggal terlebih dahulu.');return;}
+
+  var btn=document.getElementById('btnDownload');
+  btn.classList.add('loading');
+  btn.disabled=true;
+  document.getElementById('dl-btn-txt').textContent='Mengambil data...';
+  document.getElementById('dlSuccess').classList.remove('on');
+
+  gasGet('getDownloadData', {plant:cCode, date:cDate}).then(function(result){
+    btn.classList.remove('loading');
+    btn.disabled=false;
+    document.getElementById('dl-btn-txt').textContent='Download Excel (.xlsx)';
+    if(!result||!result.rows||result.rows.length===0){
+      document.getElementById('dlNoData').classList.add('on');
+      return;
+    }
+    document.getElementById('dlNoData').classList.remove('on');
+    buildXlsx(result);
+  }).catch(function(err){
+    btn.classList.remove('loading');
+    btn.disabled=false;
+    document.getElementById('dl-btn-txt').textContent='Download Excel (.xlsx)';
+    alert('Gagal mengambil data:\n'+err.message);
+  });
+}
+
+// Bangun file XLSX dari data yang dikembalikan Apps Script, lalu trigger download
+function buildXlsx(result){
+  var wb = XLSX.utils.book_new();
+
+  // Gabungkan header + data rows
+  var sheetData = [result.headers].concat(result.rows);
+
+  var ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+  // Style: header row (baris 1) \u2014 bold, background biru tua
+  // SheetJS CE tidak support full cell style, tapi kita set column widths
+  // agar file langsung rapi dibuka di Excel/Google Sheets
+  var colWidths = [
+    {wch:16}, // A Material
+    {wch:30}, // B Description
+    {wch:6},  // C S
+    {wch:8},  // D Typ
+    {wch:14}, // E Source Bin
+    {wch:8},  // F Typ
+    {wch:14}, // G Dest.Bin
+    {wch:10}, // H Plnt
+    {wch:14}, // I Batch
+    {wch:10}, // J ConfTme
+    {wch:14}, // K Conf.date
+    {wch:14}, // L SrceTgtQty
+    {wch:8},  // M AUn
+    {wch:10}, // N Typ LX02
+    {wch:16}, // O Loc LX02
+    {wch:12}, // P MB52
+    {wch:14}, // Q Qty Actual
+    {wch:10}, // R Status
+    {wch:24}, // S Remarks
+    {wch:14}, // T Date
+    {wch:18}, // U PIC
+  ];
+  ws['!cols'] = colWidths;
+
+  // Freeze baris pertama (header) \u2014 pakai !freeze
+  ws['!freeze'] = {xSplit:0, ySplit:1, topLeftCell:'A2', activePane:'bottomLeft'};
+
+  // Nama sheet: KKP
+  XLSX.utils.book_append_sheet(wb, ws, 'KKP');
+
+  // Nama file: CycleCount_[Plant]_[Date]_[Timestamp].xlsx
+  var datePart = cDate.replace(/-/g,'');
+  var ts = new Date();
+  var tsPart = [
+    ts.getFullYear(),
+    String(ts.getMonth()+1).padStart(2,'0'),
+    String(ts.getDate()).padStart(2,'0'),
+    String(ts.getHours()).padStart(2,'0'),
+    String(ts.getMinutes()).padStart(2,'0')
+  ].join('');
+  var fileName = 'CycleCount_'+cCode+'_'+datePart+'_'+tsPart+'.xlsx';
+
+  // Trigger download browser
+  XLSX.writeFile(wb, fileName);
+
+  // Tampilkan sukses
+  document.getElementById('dlSuccessName').textContent=fileName;
+  document.getElementById('dlSuccess').classList.add('on');
+  document.getElementById('dlNoData').classList.remove('on');
+}
+/* SCANNER — tap foto langsung decode, no preview */
+
+function openScanner(){
+  // Langsung trigger kamera bawaan HP — tidak butuh izin browser
+  document.getElementById('scanFail').classList.remove('on');
+  document.getElementById('scanFileInput').value = '';
+  document.getElementById('scanFileInput').click();
+  document.querySelector('.scan-btn').classList.add('scanning');
+}
+
+function onScanFile(event){
+  var file = event.target.files && event.target.files[0];
+  document.querySelector('.scan-btn').classList.remove('scanning');
+  if(!file) return;
+
+  // Tampilkan spinner decode
+  document.getElementById('scanDecoding').classList.add('on');
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var dataUrl = e.target.result;
+    // Coba BarcodeDetector dulu (Chrome Android 83+ built-in, paling cepat)
+    if('BarcodeDetector' in window){
+      decodeNative(dataUrl);
+    } else {
+      decodeZxing(dataUrl);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── BarcodeDetector (native Chrome Android) ── */
+function decodeNative(dataUrl){
+  var img = new Image();
+  img.onload = function(){
+    var det = new BarcodeDetector({
+      formats:['qr_code','code_128','code_39','code_93','ean_13','ean_8',
+               'upc_a','upc_e','data_matrix','itf','pdf_417','aztec']
+    });
+    det.detect(img).then(function(results){
+      if(results && results.length > 0){
+        onDecodeOK(results[0].rawValue);
+      } else {
+        // Fallback ZXing — mungkin BarcodeDetector tidak support format ini
+        decodeZxing(dataUrl);
+      }
+    }).catch(function(){ decodeZxing(dataUrl); });
+  };
+  img.onerror = function(){ decodeZxing(dataUrl); };
+  img.src = dataUrl;
+}
+
+/* ── ZXing fallback ── */
+function decodeZxing(dataUrl){
+  if(window._zxLoaded){ runZx(dataUrl); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js';
+  s.onload = function(){ window._zxLoaded = true; runZx(dataUrl); };
+  s.onerror = function(){
+    document.getElementById('scanDecoding').classList.remove('on');
+    showFail('Decoder failed to load. Check internet connection.');
+  };
+  document.head.appendChild(s);
+}
+
+function runZx(dataUrl){
+  var img = new Image();
+  img.onload = function(){
+    // Resize ke max 1024px untuk performa lebih cepat
+    var maxW = 1024;
+    var w = img.width, h = img.height;
+    if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    var hints = new Map();
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    var reader = new ZXing.BrowserMultiFormatReader(hints);
+    try{
+      var lum = new ZXing.RGBLuminanceSource(
+        ctx.getImageData(0,0,w,h).data, w, h
+      );
+      var res = reader.decode(
+        new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum))
+      );
+      if(res && res.getText()){ onDecodeOK(res.getText().trim()); }
+      else { showFail('No barcode detected. Try again with better lighting or closer photo.'); }
+    } catch(e){
+      showFail('No barcode detected. Make sure barcode is sharp and fully visible.');
+    }
+  };
+  img.onerror = function(){
+    showFail('Could not read image. Please try again.');
+  };
+  img.src = dataUrl;
+}
+
+function onDecodeOK(code){
+  if(!code) return;
+  document.getElementById('scanDecoding').classList.remove('on');
+
+  // Masuk search langsung
+  document.getElementById('searchIn').value = code.trim();
+  cFlt = 'all';
+  document.querySelectorAll('.flt-btn').forEach(function(b){
+    b.classList.toggle('on', b.dataset.flt === 'all');
+  });
+  renderList();
+
+  // Toast sukses
+  var toast = document.getElementById('scanToast');
+  toast.textContent = '\u2713 ' + code.trim();
+  toast.classList.add('on');
+  setTimeout(function(){
+    toast.classList.remove('on');
+    var el = document.getElementById('ilist');
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 1200);
+}
+
+function showFail(msg){
+  document.getElementById('scanDecoding').classList.remove('on');
+  document.getElementById('scanFailTxt').textContent = msg + ' Tap to try again.';
+  var fail = document.getElementById('scanFail');
+  fail.classList.add('on');
+  // Tap fail card = try again
+  fail.onclick = function(){
+    fail.classList.remove('on');
+    openScanner();
+  };
+}
+
+function closeScanner(){
+  document.getElementById('scanDecoding').classList.remove('on');
+  document.getElementById('scanFail').classList.remove('on');
+  document.querySelector('.scan-btn').classList.remove('scanning');
+  document.getElementById('scanFileInput').value = '';
+}
+</script>
+</body>
+</html>
